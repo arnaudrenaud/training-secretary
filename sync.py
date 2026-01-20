@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """
-Sync Garmin resting heart rate to Google Sheets.
+Sync training data to Google Sheets.
 
-Fetches yesterday's resting heart rate from Garmin Connect and writes it
-to the corresponding row in Google Sheets (matching by date).
+Fetches:
+- Resting heart rate from Garmin Connect
+- Commute cycling workload (kJ) from Strava
+
+Writes values to the corresponding row in Google Sheets (matching by date).
 """
 
 import base64
 import json
 import os
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import dateparser
+import requests
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,6 +45,67 @@ def get_garmin_resting_hr(target_date: date) -> int | None:
     except Exception as e:
         print(f"Error fetching heart rate data: {e}")
         return None
+
+
+def get_strava_access_token() -> str | None:
+    """Get a fresh Strava access token using the refresh token."""
+    client_id = os.environ.get("STRAVA_CLIENT_ID")
+    client_secret = os.environ.get("STRAVA_CLIENT_SECRET")
+    refresh_token = os.environ.get("STRAVA_REFRESH_TOKEN")
+
+    if not all([client_id, client_secret, refresh_token]):
+        return None
+
+    response = requests.post(
+        "https://www.strava.com/oauth/token",
+        data={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "refresh_token": refresh_token,
+            "grant_type": "refresh_token",
+        },
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+def get_strava_commute_workload(target_date: date) -> int | None:
+    """Fetch total workload (kJ) from Strava cycling commutes for a specific date."""
+    access_token = get_strava_access_token()
+    if not access_token:
+        print("Strava credentials not configured, skipping commute workload.")
+        return None
+
+    # Get activities for the target date
+    start_of_day = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
+    end_of_day = start_of_day + timedelta(days=1)
+
+    response = requests.get(
+        "https://www.strava.com/api/v3/athlete/activities",
+        headers={"Authorization": f"Bearer {access_token}"},
+        params={
+            "after": int(start_of_day.timestamp()),
+            "before": int(end_of_day.timestamp()),
+        },
+    )
+    response.raise_for_status()
+    activities = response.json()
+
+    # Filter for cycling commutes and sum kilojoules
+    total_kj = 0
+    commute_count = 0
+    for activity in activities:
+        if activity.get("type") == "Ride" and activity.get("commute"):
+            kj = activity.get("kilojoules", 0) or 0
+            total_kj += kj
+            commute_count += 1
+            print(f"  Commute: {activity.get('name')} - {kj:.0f} kJ")
+
+    if commute_count == 0:
+        print("No cycling commutes found for this date.")
+        return None
+
+    return int(total_kj)
 
 
 def get_google_sheet(sheet_id: str):
@@ -89,7 +154,7 @@ def find_row_by_date(sheet, target_date: date) -> int | None:
 
 
 def main():
-    """Main function to sync Garmin HR to Google Sheets."""
+    """Main function to sync training data to Google Sheets."""
     sheet_id = os.environ.get("GOOGLE_SHEET_ID")
     if not sheet_id:
         raise ValueError("GOOGLE_SHEET_ID environment variable required")
@@ -97,19 +162,24 @@ def main():
     # Default to yesterday's date
     target_date = date.today() - timedelta(days=1)
 
-    print(f"Fetching resting heart rate for {target_date.isoformat()}...")
+    print(f"Fetching data for {target_date.isoformat()}...")
 
     # Get resting heart rate from Garmin
+    print("\n--- Garmin Resting Heart Rate ---")
     resting_hr = get_garmin_resting_hr(target_date)
+    if resting_hr:
+        print(f"Resting heart rate: {resting_hr} bpm")
+    else:
+        print("No resting heart rate data available.")
 
-    if resting_hr is None:
-        print("No resting heart rate data available for this date.")
-        sys.exit(1)
-
-    print(f"Resting heart rate: {resting_hr} bpm")
+    # Get commute workload from Strava
+    print("\n--- Strava Commute Workload ---")
+    commute_kj = get_strava_commute_workload(target_date)
+    if commute_kj:
+        print(f"Total commute workload: {commute_kj} kJ")
 
     # Connect to Google Sheets
-    print("Connecting to Google Sheets...")
+    print("\n--- Writing to Google Sheets ---")
     sheet = get_google_sheet(sheet_id)
 
     # Find the row for the target date
@@ -121,9 +191,20 @@ def main():
 
     print(f"Found date at row {row_num}")
 
-    # Write heart rate to column B
-    sheet.update_cell(row_num, 2, resting_hr)
-    print(f"Successfully wrote {resting_hr} to row {row_num}, column B")
+    # Write data to sheet
+    if resting_hr:
+        sheet.update_cell(row_num, 2, resting_hr)  # Column B
+        print(f"Wrote resting HR ({resting_hr}) to column B")
+
+    if commute_kj:
+        sheet.update_cell(row_num, 10, commute_kj)  # Column J
+        print(f"Wrote commute workload ({commute_kj} kJ) to column J")
+
+    if not resting_hr and not commute_kj:
+        print("No data to write.")
+        sys.exit(1)
+
+    print("\nSync complete!")
 
 
 if __name__ == "__main__":
