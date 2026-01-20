@@ -18,14 +18,15 @@ Daily automated sync of resting heart rate from Garmin Connect to Google Sheets.
 
 Go to your repository **Settings > Secrets and variables > Actions** and add:
 
-| Secret | Description |
-|--------|-------------|
-| `GARMIN_EMAIL` | Your Garmin Connect email |
-| `GARMIN_PASSWORD` | Your Garmin Connect password |
+| Secret                        | Description                             |
+| ----------------------------- | --------------------------------------- |
+| `GARMIN_EMAIL`                | Your Garmin Connect email               |
+| `GARMIN_PASSWORD`             | Your Garmin Connect password            |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Base64-encoded service account JSON key |
-| `GOOGLE_SHEET_ID` | The spreadsheet ID from the URL |
+| `GOOGLE_SHEET_ID`             | The spreadsheet ID from the URL         |
 
 To base64 encode your service account JSON:
+
 ```bash
 base64 -i service-account.json | tr -d '\n'
 ```
@@ -35,6 +36,7 @@ The Google Sheet ID is in the URL: `https://docs.google.com/spreadsheets/d/SHEET
 ### 3. Google Sheet Format
 
 The script expects:
+
 - **Column A**: Dates in French locale format (e.g., "mar. 20 janv. 2026")
 - **Column B**: Where the resting heart rate will be written
 
@@ -42,7 +44,7 @@ The script expects:
 
 ### Automatic
 
-The GitHub Action runs daily at 7:00 AM UTC.
+The GitHub Action runs daily at 3:00 AM UTC.
 
 ### Manual Trigger
 
