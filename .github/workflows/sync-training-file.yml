@@ -1,13 +1,13 @@
-name: 1 AM - Tag Strava Commutes
+name: 3 AM – Copy HR, workload to training file
 
 on:
   schedule:
-    # Run daily at 1:00 AM UTC
-    - cron: "0 1 * * *"
+    # Run daily at 3:00 AM UTC
+    - cron: "0 3 * * *"
   workflow_dispatch: # Allow manual trigger
 
 jobs:
-  tag:
+  sync:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,9 +22,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run tag commutes script
+      - name: Run sync script
         env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
-        run: python tag_commutes.py
+        run: python sync.py

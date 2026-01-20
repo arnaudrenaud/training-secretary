@@ -1,13 +1,13 @@
-name: 3 AM - Daily Training Data Sync
+name: 1 AM – Tag Strava commutes
 
 on:
   schedule:
-    # Run daily at 3:00 AM UTC
-    - cron: "0 3 * * *"
+    # Run daily at 1:00 AM UTC
+    - cron: "0 1 * * *"
   workflow_dispatch: # Allow manual trigger
 
 jobs:
-  sync:
+  tag:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,13 +22,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run sync script
+      - name: Run tag commutes script
         env:
-          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
-          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
-          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
-        run: python sync.py
+        run: python tag_commutes.py
