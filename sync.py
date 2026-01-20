@@ -69,12 +69,17 @@ def get_strava_access_token() -> str | None:
     return response.json()["access_token"]
 
 
-def get_strava_commute_workload(target_date: date) -> int | None:
-    """Fetch total workload (kJ) from Strava cycling commutes for a specific date."""
+def get_strava_cycling_workloads(target_date: date) -> tuple[int | None, int | None]:
+    """
+    Fetch cycling workloads from Strava for a specific date.
+
+    Returns:
+        tuple: (non_commute_kj, commute_kj) - workload for training rides and commutes
+    """
     access_token = get_strava_access_token()
     if not access_token:
-        print("Strava credentials not configured, skipping commute workload.")
-        return None
+        print("Strava credentials not configured, skipping cycling workload.")
+        return None, None
 
     # Get activities for the target date
     start_of_day = datetime.combine(target_date, datetime.min.time(), tzinfo=timezone.utc)
@@ -91,21 +96,34 @@ def get_strava_commute_workload(target_date: date) -> int | None:
     response.raise_for_status()
     activities = response.json()
 
-    # Filter for cycling commutes and sum kilojoules
-    total_kj = 0
+    # Separate cycling activities into commute and non-commute
+    commute_kj = 0
+    non_commute_kj = 0
     commute_count = 0
+    non_commute_count = 0
+
     for activity in activities:
-        if activity.get("type") == "Ride" and activity.get("commute"):
+        activity_type = activity.get("type")
+        # Include Ride and VirtualRide (indoor cycling)
+        if activity_type in ("Ride", "VirtualRide"):
             kj = activity.get("kilojoules", 0) or 0
-            total_kj += kj
-            commute_count += 1
-            print(f"  Commute: {activity.get('name')} - {kj:.0f} kJ")
+            if activity.get("commute"):
+                commute_kj += kj
+                commute_count += 1
+                print(f"  Commute: {activity.get('name')} - {kj:.0f} kJ")
+            else:
+                non_commute_kj += kj
+                non_commute_count += 1
+                print(f"  Training: {activity.get('name')} - {kj:.0f} kJ")
 
-    if commute_count == 0:
-        print("No cycling commutes found for this date.")
-        return None
+    if commute_count == 0 and non_commute_count == 0:
+        print("No cycling activities found for this date.")
+        return None, None
 
-    return int(total_kj)
+    return (
+        int(non_commute_kj) if non_commute_count > 0 else None,
+        int(commute_kj) if commute_count > 0 else None,
+    )
 
 
 def get_google_sheet(sheet_id: str):
@@ -172,9 +190,11 @@ def main():
     else:
         print("No resting heart rate data available.")
 
-    # Get commute workload from Strava
-    print("\n--- Strava Commute Workload ---")
-    commute_kj = get_strava_commute_workload(target_date)
+    # Get cycling workloads from Strava
+    print("\n--- Strava Cycling Workload ---")
+    training_kj, commute_kj = get_strava_cycling_workloads(target_date)
+    if training_kj:
+        print(f"Total training workload: {training_kj} kJ")
     if commute_kj:
         print(f"Total commute workload: {commute_kj} kJ")
 
@@ -196,11 +216,15 @@ def main():
         sheet.update_cell(row_num, 2, resting_hr)  # Column B
         print(f"Wrote resting HR ({resting_hr}) to column B")
 
+    if training_kj:
+        sheet.update_cell(row_num, 9, training_kj)  # Column I
+        print(f"Wrote training workload ({training_kj} kJ) to column I")
+
     if commute_kj:
         sheet.update_cell(row_num, 10, commute_kj)  # Column J
         print(f"Wrote commute workload ({commute_kj} kJ) to column J")
 
-    if not resting_hr and not commute_kj:
+    if not resting_hr and not training_kj and not commute_kj:
         print("No data to write.")
         sys.exit(1)
 
