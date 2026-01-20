@@ -7,7 +7,6 @@ and sets them as commutes with the specified bike.
 """
 
 import os
-import sys
 from datetime import datetime, timedelta, timezone
 
 import requests
