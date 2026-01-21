@@ -1,63 +1,47 @@
-# Garmin Heart Rate to Google Sheets Sync
+# training-secretary
 
-Daily automated sync of resting heart rate from Garmin Connect to Google Sheets.
+## Scripts
+
+- `tag_commutes.py` — Tag yesterday's Garmin Forerunner 165 cycling activities on Strava as commutes with Peugeot Professionnel 500
+- `sync.py` — Sync yesterday's resting heart rate (Garmin Connect) and cycling workload (Strava, both commute and non-commute) to Google Sheets
 
 ## Setup
 
-### 1. Google Cloud Service Account
+### Environment
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or use existing)
-3. Enable the **Google Sheets API** and **Google Drive API**
-4. Go to **IAM & Admin > Service Accounts**
-5. Create a new service account
-6. Create a JSON key for the service account
-7. Share your Google Sheet with the service account email (with Editor access)
+Copy the `.env.example` file to `.env` and fill in the values.
 
-### 2. GitHub Repository Secrets
+#### Garmin
 
-Go to your repository **Settings > Secrets and variables > Actions** and add:
+| Variable          | How to get                   |
+| ----------------- | ---------------------------- |
+| `GARMIN_EMAIL`    | Your Garmin Connect email    |
+| `GARMIN_PASSWORD` | Your Garmin Connect password |
 
-| Secret                        | Description                             |
-| ----------------------------- | --------------------------------------- |
-| `GARMIN_EMAIL`                | Your Garmin Connect email               |
-| `GARMIN_PASSWORD`             | Your Garmin Connect password            |
-| `GOOGLE_SERVICE_ACCOUNT_JSON` | Base64-encoded service account JSON key |
-| `GOOGLE_SHEET_ID`             | The spreadsheet ID from the URL         |
+#### Strava
 
-To base64 encode your service account JSON:
+| Variable               | How to get                               |
+| ---------------------- | ---------------------------------------- |
+| `STRAVA_CLIENT_ID`     | See [Strava setup](docs/strava-setup.md) |
+| `STRAVA_CLIENT_SECRET` | See [Strava setup](docs/strava-setup.md) |
+| `STRAVA_REFRESH_TOKEN` | See [Strava setup](docs/strava-setup.md) |
+
+#### Google Sheets
+
+| Variable                      | How to get                               |
+| ----------------------------- | ---------------------------------------- |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | See [Google setup](docs/google-setup.md) |
+| `GOOGLE_SHEET_ID`             | See [Google setup](docs/google-setup.md) |
+
+#### Dependencies
 
 ```bash
-base64 -i service-account.json | tr -d '\n'
+pip install -r requirements.txt
 ```
 
-The Google Sheet ID is in the URL: `https://docs.google.com/spreadsheets/d/SHEET_ID_HERE/edit`
-
-### 3. Google Sheet Format
-
-The script expects:
-
-- **Column A**: Dates in French locale format (e.g., "mar. 20 janv. 2026")
-- **Column B**: Where the resting heart rate will be written
-
-## Usage
-
-### Automatic
-
-The GitHub Action runs daily at 3:00 AM UTC.
-
-### Manual Trigger
-
-Go to **Actions > Daily Garmin to Google Sheets Sync > Run workflow**
-
-### Local Testing
+## Run
 
 ```bash
-export GARMIN_EMAIL="your-email@example.com"
-export GARMIN_PASSWORD="your-password"
-export GOOGLE_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
-export GOOGLE_SHEET_ID="your-sheet-id"
-
-pip install -r requirements.txt
+python tag_commutes.py
 python sync.py
 ```
