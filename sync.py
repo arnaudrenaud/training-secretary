@@ -9,7 +9,6 @@ Fetches:
 Writes values to the corresponding row in Google Sheets (matching by date).
 """
 
-import base64
 import json
 import os
 import sys
@@ -133,12 +132,7 @@ def get_google_sheet(sheet_id: str):
     if not service_account_json:
         raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable required")
 
-    # Decode base64 service account credentials
-    try:
-        credentials_dict = json.loads(base64.b64decode(service_account_json))
-    except Exception:
-        # Try as plain JSON (for local testing)
-        credentials_dict = json.loads(service_account_json)
+    credentials_dict = json.loads(service_account_json)
 
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
