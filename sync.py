@@ -106,7 +106,7 @@ def get_strava_cycling_workloads(target_date: date) -> tuple[int | None, int | N
         sport_type = activity.get("sport_type")
         # Include all cycling activities (outdoor, virtual, and indoor)
         if activity_type in ("Ride", "VirtualRide") or sport_type == "IndoorCycling":
-            kj = activity.get("kilojoules", 0) or 0
+            kj = activity.get("kilojoules") or activity.get("calories") or 0
             if activity.get("commute"):
                 commute_kj += kj
                 commute_count += 1
