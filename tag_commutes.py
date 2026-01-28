@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Tag Strava cycling activities as commutes.
+Tag Strava outdoor cycling activities as commutes.
 
-Finds cycling activities from yesterday recorded on Garmin Forerunner 165
-and sets them as commutes with the specified bike.
+Finds outdoor cycling activities from yesterday recorded on Garmin Forerunner 165
+and sets them as commutes with the specified bike. Indoor/trainer rides are skipped.
 """
 
 import os
@@ -60,7 +60,8 @@ def get_activities_from_device(access_token: str, target_date, device_name: str)
     # Filter for cycling activities - need to get detailed activity for device info
     matching_activities = []
     for activity in activities:
-        if activity.get("type") not in ("Ride", "VirtualRide"):
+        # Only process outdoor rides (not virtual rides or trainer rides)
+        if activity.get("type") != "Ride" or activity.get("trainer"):
             continue
 
         # Get detailed activity to check device
