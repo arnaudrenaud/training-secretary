@@ -176,15 +176,9 @@ def find_row_by_date(sheet, target_date: date) -> int | None:
     return None
 
 
-def main():
-    """Main function to sync training data to Google Sheets."""
-    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
-    if not sheet_id:
-        raise ValueError("GOOGLE_SHEET_ID environment variable required")
-
-    # Default to yesterday's date
-    target_date = date.today() - timedelta(days=1)
-
+def sync_date(target_date: date, sheet) -> bool:
+    """Sync data for a specific date. Returns True if any data was written."""
+    print(f"\n{'='*50}")
     print(f"Fetching data for {target_date.isoformat()}...")
 
     # Get resting heart rate from Garmin
@@ -203,16 +197,13 @@ def main():
     if commute_kj:
         print(f"Total commute workload: {commute_kj} kJ")
 
-    # Connect to Google Sheets
-    print("\n--- Writing to Google Sheets ---")
-    sheet = get_google_sheet(sheet_id)
-
     # Find the row for the target date
+    print("\n--- Writing to Google Sheets ---")
     row_num = find_row_by_date(sheet, target_date)
 
     if row_num is None:
         print(f"No row found for date {target_date.isoformat()}")
-        sys.exit(1)
+        return False
 
     print(f"Found date at row {row_num}")
 
@@ -231,6 +222,33 @@ def main():
 
     if not resting_hr and not training_kj and not commute_kj:
         print("No data to write.")
+        return False
+
+    return True
+
+
+def main():
+    """Main function to sync training data to Google Sheets."""
+    sheet_id = os.environ.get("GOOGLE_SHEET_ID")
+    if not sheet_id:
+        raise ValueError("GOOGLE_SHEET_ID environment variable required")
+
+    # Connect to Google Sheets once
+    sheet = get_google_sheet(sheet_id)
+
+    # Process yesterday and the day before yesterday
+    target_dates = [
+        date.today() - timedelta(days=2),  # Day before yesterday
+        date.today() - timedelta(days=1),  # Yesterday
+    ]
+
+    any_data_written = False
+    for target_date in target_dates:
+        if sync_date(target_date, sheet):
+            any_data_written = True
+
+    if not any_data_written:
+        print("\nNo data written for any date.")
         sys.exit(1)
 
     print("\nSync complete!")

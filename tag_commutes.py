@@ -92,14 +92,10 @@ def update_activity(access_token: str, activity_id: int, gear_id: str) -> bool:
     return response.status_code == 200
 
 
-def main():
-    """Main function to tag commutes."""
-    target_date = (datetime.now(timezone.utc) - timedelta(days=1)).date()
-
+def tag_commutes_for_date(access_token: str, target_date) -> None:
+    """Tag commutes for a specific date."""
+    print(f"\n{'='*50}")
     print(f"Looking for cycling activities on {target_date} from {DEVICE_NAME}...")
-
-    access_token = get_strava_access_token()
-    print(f"Using bike: {BIKE_NAME} ({BIKE_ID})")
 
     # Get activities from the device
     activities = get_activities_from_device(access_token, target_date, DEVICE_NAME)
@@ -124,6 +120,21 @@ def main():
             print(f"  - {name}: tagged as commute with {BIKE_NAME}")
         else:
             print(f"  - {name}: failed to update")
+
+
+def main():
+    """Main function to tag commutes."""
+    access_token = get_strava_access_token()
+    print(f"Using bike: {BIKE_NAME} ({BIKE_ID})")
+
+    # Process yesterday and the day before yesterday
+    target_dates = [
+        (datetime.now(timezone.utc) - timedelta(days=2)).date(),  # Day before yesterday
+        (datetime.now(timezone.utc) - timedelta(days=1)).date(),  # Yesterday
+    ]
+
+    for target_date in target_dates:
+        tag_commutes_for_date(access_token, target_date)
 
     print("\nDone!")
 
