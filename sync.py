@@ -24,17 +24,19 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 
-def get_garmin_resting_hr(target_date: date) -> int | None:
-    """Fetch resting heart rate for a specific date from Garmin Connect."""
+def garmin_login():
+    """Authenticate with Garmin once."""
     email = os.environ.get("GARMIN_EMAIL")
     password = os.environ.get("GARMIN_PASSWORD")
 
     if not email or not password:
         raise ValueError("GARMIN_EMAIL and GARMIN_PASSWORD environment variables required")
 
-    # Authenticate with Garmin
     garth.login(email, password)
 
+
+def get_garmin_resting_hr(target_date: date) -> int | None:
+    """Fetch resting heart rate for a specific date from Garmin Connect."""
     # Fetch heart rate data for the target date
     date_str = target_date.isoformat()
     try:
@@ -235,6 +237,9 @@ def main():
 
     # Connect to Google Sheets once
     sheet = get_google_sheet(sheet_id)
+
+    # Authenticate with Garmin once (avoid 429 rate limiting from multiple logins)
+    garmin_login()
 
     # Process yesterday and the day before yesterday
     target_dates = [
