@@ -12,6 +12,7 @@ Writes values to the corresponding row in Google Sheets (matching by date).
 import json
 import os
 import sys
+import tempfile
 from datetime import date, datetime, timedelta, timezone
 
 import dateparser
@@ -25,12 +26,31 @@ from google.oauth2.service_account import Credentials
 
 
 def garmin_login():
-    """Authenticate with Garmin once."""
+    """Authenticate with Garmin once.
+
+    Prefers token-based auth (GARMIN_OAUTH1_TOKEN + GARMIN_OAUTH2_TOKEN env vars)
+    to avoid 429 rate limiting from repeated password logins in CI.
+    Falls back to password login if tokens are not set.
+    """
+    oauth1 = os.environ.get("GARMIN_OAUTH1_TOKEN")
+    oauth2 = os.environ.get("GARMIN_OAUTH2_TOKEN")
+
+    if oauth1 and oauth2:
+        token_dir = tempfile.mkdtemp()
+        with open(os.path.join(token_dir, "oauth1_token.json"), "w") as f:
+            f.write(oauth1)
+        with open(os.path.join(token_dir, "oauth2_token.json"), "w") as f:
+            f.write(oauth2)
+        garth.resume(token_dir)
+        return
+
     email = os.environ.get("GARMIN_EMAIL")
     password = os.environ.get("GARMIN_PASSWORD")
 
     if not email or not password:
-        raise ValueError("GARMIN_EMAIL and GARMIN_PASSWORD environment variables required")
+        raise ValueError(
+            "Either GARMIN_OAUTH1_TOKEN+GARMIN_OAUTH2_TOKEN or GARMIN_EMAIL+GARMIN_PASSWORD are required"
+        )
 
     garth.login(email, password)
 
