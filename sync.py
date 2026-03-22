@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from datetime import date, datetime, timedelta, timezone
 
 import dateparser
@@ -57,15 +58,20 @@ def garmin_login():
 
 def get_garmin_resting_hr(target_date: date) -> int | None:
     """Fetch resting heart rate for a specific date from Garmin Connect."""
-    # Fetch heart rate data for the target date
     date_str = target_date.isoformat()
-    try:
-        hr_data = garth.connectapi(f"/usersummary-service/usersummary/daily?calendarDate={date_str}")
-        resting_hr = hr_data.get("restingHeartRate")
-        return resting_hr
-    except Exception as e:
-        print(f"Error fetching heart rate data: {e}")
-        return None
+    for attempt in range(3):
+        try:
+            hr_data = garth.connectapi(f"/usersummary-service/usersummary/daily?calendarDate={date_str}")
+            resting_hr = hr_data.get("restingHeartRate")
+            return resting_hr
+        except Exception as e:
+            if "429" in str(e) and attempt < 2:
+                wait = 60 * (attempt + 1)
+                print(f"Rate limited (429), retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"Error fetching heart rate data: {e}")
+                return None
 
 
 def get_strava_access_token() -> str | None:
