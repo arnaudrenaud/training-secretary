@@ -46,7 +46,10 @@ def garmin_login():
         # calls share the same fresh token (avoids each call triggering its own
         # exchange and hitting Garmin's rate limit on /oauth-service/oauth/exchange).
         if garth.client.oauth2_token is None or garth.client.oauth2_token.expired:
-            garth.client.refresh_oauth2()
+            try:
+                garth.client.refresh_oauth2()
+            except Exception as e:
+                print(f"Warning: could not pre-exchange Garmin OAuth2 token: {e}")
         return
 
     email = os.environ.get("GARMIN_EMAIL")
