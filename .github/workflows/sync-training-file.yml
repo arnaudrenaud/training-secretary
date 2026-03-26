@@ -34,3 +34,14 @@ jobs:
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           STRAVA_REFRESH_TOKEN: ${{ secrets.STRAVA_REFRESH_TOKEN }}
         run: python sync.py
+
+      - name: Persist refreshed Garmin tokens to secrets
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          if [ -f /tmp/garmin_oauth2_token.json ]; then
+            gh secret set GARMIN_OAUTH1_TOKEN --repo arnaudrenaud/training-secretary < /tmp/garmin_oauth1_token.json
+            gh secret set GARMIN_OAUTH2_TOKEN --repo arnaudrenaud/training-secretary < /tmp/garmin_oauth2_token.json
+            echo "Garmin tokens persisted to secrets."
+          fi

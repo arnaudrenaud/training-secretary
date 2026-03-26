@@ -25,6 +25,14 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 
+def _write_garmin_tokens():
+    from dataclasses import asdict
+    with open("/tmp/garmin_oauth1_token.json", "w") as f:
+        json.dump(asdict(garth.client.oauth1_token), f)
+    with open("/tmp/garmin_oauth2_token.json", "w") as f:
+        json.dump(asdict(garth.client.oauth2_token), f)
+
+
 def garmin_login():
     """Authenticate with Garmin once.
 
@@ -48,6 +56,10 @@ def garmin_login():
         if garth.client.oauth2_token is None or garth.client.oauth2_token.expired:
             try:
                 garth.client.refresh_oauth2()
+                # Write refreshed tokens so the CI workflow can persist them back
+                # to secrets, ensuring the next run starts with a valid token.
+                _write_garmin_tokens()
+                print("Garmin OAuth2 token refreshed and saved.")
             except Exception as e:
                 print(f"Warning: could not pre-exchange Garmin OAuth2 token: {e}")
         return
@@ -61,6 +73,7 @@ def garmin_login():
         )
 
     garth.login(email, password)
+    _write_garmin_tokens()
 
 
 def get_garmin_resting_hr(target_date: date) -> int | None:
