@@ -56,13 +56,13 @@ def garmin_login():
         if garth.client.oauth2_token is None or garth.client.oauth2_token.expired:
             try:
                 garth.client.refresh_oauth2()
-                # Write refreshed tokens so the CI workflow can persist them back
-                # to secrets, ensuring the next run starts with a valid token.
                 _write_garmin_tokens()
                 print("Garmin OAuth2 token refreshed and saved.")
+                return
             except Exception as e:
-                print(f"Warning: could not pre-exchange Garmin OAuth2 token: {e}")
-        return
+                print(f"Warning: OAuth2 token exchange failed ({e}), falling back to password login.")
+        else:
+            return
 
     email = os.environ.get("GARMIN_EMAIL")
     password = os.environ.get("GARMIN_PASSWORD")
