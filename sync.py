@@ -3,7 +3,6 @@
 Sync training data to Google Sheets.
 
 Fetches:
-- Resting heart rate from Garmin Connect
 - Commute cycling workload (kJ) from Strava
 
 Writes values to the corresponding row in Google Sheets (matching by date).
@@ -12,7 +11,6 @@ Writes values to the corresponding row in Google Sheets (matching by date).
 import json
 import os
 import sys
-import tempfile
 from datetime import date, datetime, timedelta, timezone
 
 import dateparser
@@ -20,72 +18,8 @@ import requests
 from dotenv import load_dotenv
 
 load_dotenv()
-import garth
 import gspread
 from google.oauth2.service_account import Credentials
-
-
-def _write_garmin_tokens():
-    from dataclasses import asdict
-    with open("/tmp/garmin_oauth1_token.json", "w") as f:
-        json.dump(asdict(garth.client.oauth1_token), f)
-    with open("/tmp/garmin_oauth2_token.json", "w") as f:
-        json.dump(asdict(garth.client.oauth2_token), f)
-
-
-def garmin_login():
-    """Authenticate with Garmin once.
-
-    Prefers token-based auth (GARMIN_OAUTH1_TOKEN + GARMIN_OAUTH2_TOKEN env vars)
-    to avoid 429 rate limiting from repeated password logins in CI.
-    Falls back to password login if tokens are not set.
-    """
-    oauth1 = os.environ.get("GARMIN_OAUTH1_TOKEN")
-    oauth2 = os.environ.get("GARMIN_OAUTH2_TOKEN")
-
-    if oauth1 and oauth2:
-        token_dir = tempfile.mkdtemp()
-        with open(os.path.join(token_dir, "oauth1_token.json"), "w") as f:
-            f.write(oauth1)
-        with open(os.path.join(token_dir, "oauth2_token.json"), "w") as f:
-            f.write(oauth2)
-        garth.resume(token_dir)
-        # Pre-exchange the OAuth2 token if expired so all subsequent connectapi()
-        # calls share the same fresh token (avoids each call triggering its own
-        # exchange and hitting Garmin's rate limit on /oauth-service/oauth/exchange).
-        if garth.client.oauth2_token is None or garth.client.oauth2_token.expired:
-            try:
-                garth.client.refresh_oauth2()
-                _write_garmin_tokens()
-                print("Garmin OAuth2 token refreshed and saved.")
-                return
-            except Exception as e:
-                print(f"Warning: OAuth2 token exchange failed ({e}), falling back to password login.")
-        else:
-            return
-
-    email = os.environ.get("GARMIN_EMAIL")
-    password = os.environ.get("GARMIN_PASSWORD")
-
-    if not email or not password:
-        raise ValueError(
-            "Either GARMIN_OAUTH1_TOKEN+GARMIN_OAUTH2_TOKEN or GARMIN_EMAIL+GARMIN_PASSWORD are required"
-        )
-
-    garth.login(email, password)
-    _write_garmin_tokens()
-
-
-def get_garmin_resting_hr(target_date: date) -> int | None:
-    """Fetch resting heart rate for a specific date from Garmin Connect."""
-    date_str = target_date.isoformat()
-    try:
-        hr_data = garth.connectapi(f"/usersummary-service/usersummary/daily?calendarDate={date_str}")
-        resting_hr = hr_data.get("restingHeartRate")
-        return resting_hr
-    except Exception as e:
-        print(f"Error fetching heart rate data: {e}")
-        return None
 
 
 def get_strava_access_token() -> str | None:
@@ -223,14 +157,6 @@ def sync_date(target_date: date, sheet) -> bool:
     print(f"\n{'='*50}")
     print(f"Fetching data for {target_date.isoformat()}...")
 
-    # Get resting heart rate from Garmin
-    print("\n--- Garmin Resting Heart Rate ---")
-    resting_hr = get_garmin_resting_hr(target_date)
-    if resting_hr:
-        print(f"Resting heart rate: {resting_hr} bpm")
-    else:
-        print("No resting heart rate data available.")
-
     # Get cycling workloads from Strava
     print("\n--- Strava Cycling Workload ---")
     training_kj, commute_kj = get_strava_cycling_workloads(target_date)
@@ -249,11 +175,6 @@ def sync_date(target_date: date, sheet) -> bool:
 
     print(f"Found date at row {row_num}")
 
-    # Write data to sheet
-    if resting_hr:
-        sheet.update_cell(row_num, 2, resting_hr)  # Column B
-        print(f"Wrote resting HR ({resting_hr}) to column B")
-
     if training_kj:
         sheet.update_cell(row_num, 9, training_kj)  # Column I
         print(f"Wrote training workload ({training_kj} kJ) to column I")
@@ -262,7 +183,7 @@ def sync_date(target_date: date, sheet) -> bool:
         sheet.update_cell(row_num, 10, commute_kj)  # Column J
         print(f"Wrote commute workload ({commute_kj} kJ) to column J")
 
-    if not resting_hr and not training_kj and not commute_kj:
+    if not training_kj and not commute_kj:
         print("No data to write.")
         return False
 
@@ -275,11 +196,7 @@ def main():
     if not sheet_id:
         raise ValueError("GOOGLE_SHEET_ID environment variable required")
 
-    # Connect to Google Sheets once
     sheet = get_google_sheet(sheet_id)
-
-    # Authenticate with Garmin once (avoid 429 rate limiting from multiple logins)
-    garmin_login()
 
     # Process yesterday and the day before yesterday
     target_dates = [
