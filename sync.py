@@ -10,7 +10,6 @@ Writes values to the corresponding row in Google Sheets (matching by date).
 
 import json
 import os
-import sys
 from datetime import date, datetime, timedelta, timezone
 
 import dateparser
@@ -210,8 +209,7 @@ def main():
             any_data_written = True
 
     if not any_data_written:
-        print("\nNo data written for any date.")
-        sys.exit(1)
+        print("\nNo data to write for any date.")
 
     print("\nSync complete!")
 
