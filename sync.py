@@ -39,6 +39,16 @@ def get_strava_access_token() -> str | None:
             "grant_type": "refresh_token",
         },
     )
+
+    if response.status_code == 403:
+        print(
+            "Strava refused the token refresh (HTTP 403). "
+            "The STRAVA_REFRESH_TOKEN GitHub secret is likely expired or revoked; "
+            "generate a new token with activity:read_all and activity:write scopes. "
+            "Skipping Strava work for this run."
+        )
+        return None
+
     response.raise_for_status()
     return response.json()["access_token"]
 

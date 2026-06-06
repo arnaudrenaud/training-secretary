@@ -37,6 +37,16 @@ def get_strava_access_token() -> str | None:
             "grant_type": "refresh_token",
         },
     )
+
+    if response.status_code == 403:
+        print(
+            "Strava refused the token refresh (HTTP 403). "
+            "The STRAVA_REFRESH_TOKEN GitHub secret is likely expired or revoked; "
+            "generate a new token with activity:read_all and activity:write scopes. "
+            "Skipping Strava work for this run."
+        )
+        return None
+
     response.raise_for_status()
     return response.json()["access_token"]
 
@@ -125,6 +135,10 @@ def tag_commutes_for_date(access_token: str, target_date) -> None:
 def main():
     """Main function to tag commutes."""
     access_token = get_strava_access_token()
+    if not access_token:
+        print("No Strava access token available; nothing to tag.")
+        return
+
     print(f"Using bike: {BIKE_NAME} ({BIKE_ID})")
 
     # Process yesterday and the day before yesterday
